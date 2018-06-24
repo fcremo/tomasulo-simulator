@@ -3,7 +3,7 @@ import simpy
 from instruction import *
 from registerfile import RegisterFile
 from reservation_station import ALUReservationStation, MemReservationStation
-from functionalunit import AluFU, MemFU
+from functional_unit import AluFU, MemFU
 from log_utils import get_logger
 
 from cdb import CDB
@@ -15,14 +15,15 @@ class CPU:
     DEFAULT_CDB_WIDTH = 1
     DEFAULT_ALU_RS = 2
     DEFAULT_MEM_RS = 2
-    DEFAULT_ALU_FU = 2
+    DEFAULT_ALU_FU = 1
     DEFAULT_MEM_FU = 2
-    DEFAULT_FETCH_CLOCKS = 1
+    DEFAULT_FETCH_LATENCY = 1
 
     def __init__(self, env: simpy.Environment, instructions,
                  memory=bytearray(DEFAULT_MEM_SIZE),
                  reg_file=RegisterFile(DEFAULT_INT_REGS_NUMBER),
-                 CDB_width=DEFAULT_CDB_WIDTH, fetch_clocks=DEFAULT_FETCH_CLOCKS,
+                 CDB_width=DEFAULT_CDB_WIDTH,
+                 fetch_latency=DEFAULT_FETCH_LATENCY,
                  alu_RS=DEFAULT_ALU_RS, mem_RS=DEFAULT_MEM_RS,
                  alu_FU=DEFAULT_ALU_FU, mem_FU=DEFAULT_MEM_FU,
                  breakpoint_handler=None
@@ -36,10 +37,12 @@ class CPU:
         # Common data bus
         self.CDB = CDB(env, CDB_width)
 
-        self.fetch_clocks = fetch_clocks
+        self.fetch_clocks = fetch_latency
 
-        self.alu_FU = [AluFU(env) for _ in range(alu_FU)]
-        self.mem_FU = [MemFU(env) for _ in range(mem_FU)]
+        self.alu_FU = simpy.Store(env)
+        [self.alu_FU.put(AluFU(env)) for _ in range(alu_FU)]
+        self.mem_FU = simpy.Store(env)
+        [self.mem_FU.put(MemFU(env)) for _ in range(mem_FU)]
 
         self.alu_RS = [ALUReservationStation(env, self) for _ in range(alu_RS)]
         self.mem_RS = [MemReservationStation(env, self) for _ in range(mem_RS)]

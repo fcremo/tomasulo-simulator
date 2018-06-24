@@ -1,4 +1,4 @@
-from .alu_instruction import AluInstruction
+from .alu_instructions import AluInstruction
 
 
 class IntegerInstruction(AluInstruction):

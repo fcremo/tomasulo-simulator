@@ -56,14 +56,14 @@ class BreakpointInstruction(Instruction):
 # TODO: importing stuff not at the top of the file was done to solve circular dependencies and
 # provide the possibility to do "from instruction import *"
 # There has to be a better way
-from .alu_instruction import *
+from .alu_instructions import *
 from .integer_instructions import *
 from .control_flow_instructions import *
 from .mem_instructions import *
 
 
 __all__ = ["HaltInstruction", "BreakpointInstruction"]
-__all__ += alu_instruction.__all__
+__all__ += alu_instructions.__all__
 __all__ += integer_instructions.__all__
 __all__ += control_flow_instructions.__all__
 __all__ += mem_instructions.__all__

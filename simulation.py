@@ -25,7 +25,6 @@ def main():
 
     assembler = Assembler()
     assembler += AddInstruction("R1", "R0", 3)
-    assembler += AddInstruction("R1", "R0", 3)
     assembler += Label("LOOP")
     assembler += BLEInstruction("R1", 0, "END")
     assembler += AddInstruction("R2", "R2", 2)

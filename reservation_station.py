@@ -4,6 +4,8 @@ from instruction import *
 from collections import namedtuple
 from log_utils import get_logger
 
+RSResult = namedtuple("RSResult", ["rs", "result"])
+
 
 class ReservationStation(simpy.Resource):
     incremental_id = 1
@@ -21,6 +23,8 @@ class ReservationStation(simpy.Resource):
         self.execution_process = None
         self.lock_req = None
 
+        self.FU = None
+
         self.id = "RS" + str(self.incremental_id)
         ReservationStation.incremental_id += 1
         self._log = get_logger(env, self.id)
@@ -31,6 +35,7 @@ class ReservationStation(simpy.Resource):
     def reset(self):
         self.instruction = None
         self.execution_process = None
+        self.FU = None
 
     @property
     def busy(self):
@@ -56,8 +61,6 @@ class ALUReservationStation(ReservationStation):
     def enqueue_instruction(self, instruction, lock_request):
         self.instruction = instruction
         self.lock_req = lock_request
-
-        # TODO: allocate FU
 
         # Create a new event that will be triggered when the result is written to the CDB
         self.result_broadcast_event = simpy.Event(self.env)
@@ -87,6 +90,9 @@ class ALUReservationStation(ReservationStation):
             else:
                 self._log("WAW detected and avoided for reg {}", self.instruction.dst_reg)
 
+        # Release the functional unit
+        yield self.alu_FU.put(self.FU)
+
         # Reset RS status
         self.reset()
 
@@ -101,7 +107,7 @@ class ALUReservationStation(ReservationStation):
         self.reg_file[self.instruction.dst_reg] = self
 
         # Wait for the operands to be ready
-        yield self.env.process(self._wait_for_operands())
+        yield self.env.process(self._wait_for_dependencies())
 
         # Execute the instruction
         self.execution_process = self.env.timeout(self.instruction.latency)
@@ -132,34 +138,54 @@ class ALUReservationStation(ReservationStation):
         else:
             self.OP2_source_rs = self.reg_file[instruction.OP2]
 
-    def _wait_for_operands(self):
-        pending_results = []
-        pending_results_names = {}
+    def _wait_for_dependencies(self):
+        dependencies = []
+        pending_operands = {}
         OP1_broadcast_event, OP2_broadcast_event = None, None
         if self.OP1_source_rs is not None:
             OP1_broadcast_event = self.OP1_source_rs.result_broadcast_event
-            pending_results.append(OP1_broadcast_event)
-            pending_results_names[self.instruction.OP1] = self.OP1_source_rs
+            dependencies.append(OP1_broadcast_event)
+            pending_operands[self.instruction.OP1] = self.OP1_source_rs
         if self.OP2_source_rs is not None:
             OP2_broadcast_event = self.OP2_source_rs.result_broadcast_event
-            pending_results.append(OP2_broadcast_event)
-            pending_results_names[self.instruction.OP2] = self.OP2_source_rs
+            dependencies.append(OP2_broadcast_event)
+            pending_operands[self.instruction.OP2] = self.OP2_source_rs
 
-        if pending_results:
-            _pending_str = ", ".join([str(reg) + " from " + str(rs) for reg, rs in pending_results_names.items()])
-            self._log("RAW: {} waiting for {}", self.instruction, _pending_str)
+        fu_request = self.env.process(self._reserve_functional_unit())
+        dependencies.append(fu_request)
+
+        if pending_operands:
+            pending_str = ", ".join([str(reg) + " from " + str(rs) for reg, rs in pending_operands.items()])
+            self._log("RAW: {} waiting for {}", self.instruction, pending_str)
         else:
             self._log("Operands already available")
 
         # Wait for operands to be ready
-        results = yield self.env.all_of(pending_results)
+        results = yield self.env.all_of(dependencies)
         if OP1_broadcast_event in results:
             self.OP1_val = results[OP1_broadcast_event].result
         if OP2_broadcast_event in results:
             self.OP2_val = results[OP2_broadcast_event].result
 
-        if pending_results:
+        self.FU = results[fu_request]
+
+        if pending_operands:
             self._log("Operands of {} are now ready", self.instruction)
+
+    def _reserve_functional_unit(self):
+        struct_conflict = False
+        if not self.cpu.alu_FU.items:
+            self._log("Structural conflict: no FU free for {}", self)
+            struct_conflict = True
+
+        fu = yield self.cpu.alu_FU.get()
+
+        if struct_conflict:
+            self._log("Structural conflict solved, obtained {}", fu)
+        else:
+            self._log("Using {}", fu)
+
+        return fu
 
     def _enqueue_control_flow_instruction(self):
         if isinstance(self.instruction, JumpInstruction):
@@ -171,6 +197,7 @@ class ALUReservationStation(ReservationStation):
 
     def _execute_jump_instruction(self):
         # TODO: support indirect jumps like JMP R1
+        self.FU = yield self.env.process(self._reserve_functional_unit())
         self._log("Starting execution of {}", self.instruction)
         yield self.env.timeout(self.instruction.latency)
         self._log("End execution of {}", self.instruction)
@@ -178,7 +205,7 @@ class ALUReservationStation(ReservationStation):
 
     def _execute_branch_instruction(self):
         self._decode_operands()
-        yield self.env.process(self._wait_for_operands())
+        yield self.env.process(self._wait_for_dependencies())
         yield self.env.timeout(self.instruction.latency)
         self.result = self.instruction.result(self.OP1_val, self.OP2_val, self.reg_file["PC"])
         if self.result != self.reg_file["PC"]:
@@ -205,6 +232,3 @@ class MemReservationStation(ReservationStation):
 
     def enqueue_instruction(self, instruction, lock_request):
         raise NotImplementedError()
-
-
-RSResult = namedtuple("RSResult", ["rs", "result"])

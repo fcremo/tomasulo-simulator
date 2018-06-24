@@ -34,4 +34,4 @@ class StoreInstruction(MemInstruction):
         return "{}, [{}+{}]".format(self.src_reg, self.offset_reg, self.base)
 
 
-__all__ = ["LoadInstruction", "StoreInstruction"]
+__all__ = ["MemInstruction", "LoadInstruction", "StoreInstruction"]
