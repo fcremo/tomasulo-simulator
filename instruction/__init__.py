@@ -53,8 +53,8 @@ class BreakpointInstruction(Instruction):
         return "BREAK"
 
 
-# TODO: importing stuff not at the top of the file was done to solve circular dependencies and
-# provide the possibility to do "from instruction import *"
+# TODO: importing stuff not at the top of the file was done to solve circular dependencies
+# and retain the possibility to do "from instruction import *"
 # There has to be a better way
 from .alu_instructions import *
 from .integer_instructions import *
