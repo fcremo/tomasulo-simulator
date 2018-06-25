@@ -129,15 +129,15 @@ class ALUReservationStation(ReservationStation):
             self._log("Operands of {} are now ready", self.instruction)
 
     def _reserve_functional_unit(self):
-        struct_conflict = False
+        struct_hazard = False
         if not self.cpu.alu_FU.items:
-            self._log("Structural conflict: no FU free for {}", self)
-            struct_conflict = True
+            self._log("Structural hazard: no FU free for {}", self)
+            struct_hazard = True
 
         fu = yield self.cpu.alu_FU.get()
 
-        if struct_conflict:
-            self._log("Structural conflict solved, obtained {}", fu)
+        if struct_hazard:
+            self._log("Structural hazard solved, obtained {}", fu)
         else:
             self._log("Using {}", fu)
 

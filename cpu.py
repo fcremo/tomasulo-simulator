@@ -11,7 +11,7 @@ from cdb import CDB
 
 class CPU:
     DEFAULT_MEM_SIZE = 0x1000
-    DEFAULT_INT_REGS_NUMBER = 8
+    DEFAULT_INT_REGS = 8
     DEFAULT_CDB_WIDTH = 1
     DEFAULT_ALU_RS = 2
     DEFAULT_MEM_RS = 2
@@ -21,7 +21,7 @@ class CPU:
 
     def __init__(self, env: simpy.Environment, instructions,
                  memory=bytearray(DEFAULT_MEM_SIZE),
-                 reg_file=RegisterFile(DEFAULT_INT_REGS_NUMBER),
+                 reg_file=RegisterFile(DEFAULT_INT_REGS),
                  CDB_width=DEFAULT_CDB_WIDTH,
                  fetch_latency=DEFAULT_FETCH_LATENCY,
                  alu_RS=DEFAULT_ALU_RS, mem_RS=DEFAULT_MEM_RS,
@@ -83,7 +83,7 @@ class CPU:
 
             rs = self.find_free_reservation_station(ni)
             while rs is None:
-                self._log("Structural conflict: no RS found for {}", ni)
+                self._log("Structural hazard: no RS found for {}", ni)
                 yield self.env.timeout(1)
                 rs = self.find_free_reservation_station(ni)
 
