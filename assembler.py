@@ -11,7 +11,7 @@ class Assembler:
         for i in self.code:
             if isinstance(i, instruction.ControlFlowInstruction):
                 try:
-                    i.address = self.labels.get(i.label)
+                    i.address = self.labels[i.label]
                 except KeyError:
                     raise RuntimeError("Label {} is not declared".format(i.label))
 
