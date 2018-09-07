@@ -1,8 +1,10 @@
-from . import Instruction
+from abc import ABC, abstractmethod
+
+from .instruction import Instruction
 
 
-class MemInstruction(Instruction):
-    latency = 3
+class MemInstruction(Instruction, ABC):
+    mnemonic = "MEM"
 
     def __init__(self, offset_reg, base):
         super().__init__()
@@ -32,6 +34,3 @@ class StoreInstruction(MemInstruction):
     @property
     def operands_str(self):
         return "{}, [{}+{}]".format(self.src_reg, self.offset_reg, self.base)
-
-
-__all__ = ["MemInstruction", "LoadInstruction", "StoreInstruction"]

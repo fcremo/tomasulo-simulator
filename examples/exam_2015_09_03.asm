@@ -1,0 +1,13 @@
+.const !VECTA 0
+.const !VECTB 20
+
+LD R1, [!VECTA + R6]
+LD R2, [!VECTB + R6]
+ADD R5, R2, R1
+LD R3, [R5 + 0]
+OR R3, R5, R3
+ST R3, [R5 + 0]
+ADD R6, R6, 4
+BLT R6, R7, DUMMY
+DUMMY:
+HLT

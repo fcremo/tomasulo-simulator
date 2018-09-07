@@ -19,8 +19,12 @@ class Assembler:
 
         return assembled
 
+    def set_code(self, code):
+        for c in code:
+            self.__add__(c)
+
     def __add__(self, code):
-        if isinstance(code, Label):
+        if isinstance(code, instruction.Label):
             self.labels[code.id] = len(self.code)
 
         elif isinstance(code, instruction.Instruction):
@@ -29,21 +33,7 @@ class Assembler:
         return self
 
 
-class Label:
-    def __init__(self, id):
-        self.id = id
-
-    def __repr__(self):
-        return "LAB {}".format(self.id)
-
-    def __str__(self):
-        return str(self.id)
-
-    def __hash__(self):
-        return self.id.__hash__()
-
-    def __eq__(self, other):
-        if isinstance(other, Label):
-            return self.id == other.id
-
-        return other == self.id
+def assemble(instructions):
+    assembler = Assembler()
+    assembler.set_code(instructions)
+    return assembler.get_assembled_code()

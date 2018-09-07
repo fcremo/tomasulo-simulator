@@ -1,51 +1,50 @@
+from copy import deepcopy
+
 import simpy
 
-from instruction import *
+import execution_trace as etrace
+from cpu_config import CpuConfig
+from cdb import CDB
+from functional_unit import AluFU, MemFU
+from instruction import (
+    HaltInstruction, BreakpointInstruction,
+    ControlFlowInstruction, MemInstruction,
+    AluInstruction, FloatingInstruction
+)
+from log_utils import get_logger
+from memory import Memory
 from registerfile import RegisterFile
 from reservation_station import ALUReservationStation, MemReservationStation
-from functional_unit import AluFU, MemFU
-from log_utils import get_logger
-
-from cdb import CDB
 
 
 class CPU:
-    DEFAULT_MEM_SIZE = 0x1000
-    DEFAULT_INT_REGS = 8
-    DEFAULT_CDB_WIDTH = 1
-    DEFAULT_ALU_RS = 2
-    DEFAULT_MEM_RS = 2
-    DEFAULT_ALU_FU = 1
-    DEFAULT_MEM_FU = 2
-    DEFAULT_FETCH_LATENCY = 1
+    def __init__(self, env: simpy.Environment, instructions, config: CpuConfig, breakpoint_handler=None):
+        self._instructions = instructions
+        self.config = config
 
-    def __init__(self, env: simpy.Environment, instructions,
-                 memory=bytearray(DEFAULT_MEM_SIZE),
-                 reg_file=RegisterFile(DEFAULT_INT_REGS),
-                 CDB_width=DEFAULT_CDB_WIDTH,
-                 fetch_latency=DEFAULT_FETCH_LATENCY,
-                 alu_RS=DEFAULT_ALU_RS, mem_RS=DEFAULT_MEM_RS,
-                 alu_FU=DEFAULT_ALU_FU, mem_FU=DEFAULT_MEM_FU,
-                 breakpoint_handler=None
-                 ):
-        self.instructions = instructions
-        self.next_instruction = None
-
-        self.memory = memory
-        self.reg_file = reg_file
+        self.memory = Memory(env, config)
+        self.reg_file = RegisterFile(env, self, config.gp_registers, config.fp_registers)
 
         # Common data bus
-        self.CDB = CDB(env, CDB_width)
+        self.CDB = CDB(env, config.cdb_width)
 
-        self.fetch_clocks = fetch_latency
-
+        # TODO: distinguish ALU from FPALU
         self.alu_FU = simpy.Store(env)
-        [self.alu_FU.put(AluFU(env)) for _ in range(alu_FU)]
+        [self.alu_FU.put(AluFU()) for _ in range(config.alu_fu)]
+        self.fpalu_FU = simpy.Store(env)
+        [self.fpalu_FU.put(AluFU()) for _ in range(config.fpalu_fu)]
         self.mem_FU = simpy.Store(env)
-        [self.mem_FU.put(MemFU(env)) for _ in range(mem_FU)]
+        [self.mem_FU.put(MemFU()) for _ in range(config.mem_fu)]
 
-        self.alu_RS = [ALUReservationStation(env, self) for _ in range(alu_RS)]
-        self.mem_RS = [MemReservationStation(env, self) for _ in range(mem_RS)]
+        self.alu_RS = simpy.Store(env)
+        [self.alu_RS.put(ALUReservationStation(env, self, self.alu_FU, self.alu_RS)) for _ in range(config.alu_rs)]
+        self.fpalu_RS = simpy.Store(env)
+        [self.fpalu_RS.put(ALUReservationStation(env, self, self.fpalu_FU, self.fpalu_RS)) for _ in range(config.fpalu_rs)]
+        self.mem_RS = simpy.Store(env)
+        [self.mem_RS.put(MemReservationStation(env, self, self.mem_FU, self.mem_RS)) for _ in range(config.mem_rs)]
+
+        # This list will hold the executed instructions
+        self.executed_instructions = []
 
         self.env = env
 
@@ -56,76 +55,104 @@ class CPU:
 
         self._log = get_logger(env, "CPU")
 
-    def issue(self):
+    def _dispatch(self):
         while True:
-            if self.can_fetch():
-                self._log("Fetching instruction at PC {}", self.reg_file["PC"])
-                self.next_instruction = self.instructions[self.reg_file["PC"]]
-                yield self.env.timeout(self.fetch_clocks)
-                self._log("Fetched instruction {}", self.next_instruction)
-                self.reg_file["PC"] += 1
-            else:
-                self._log("Stall while fetching instruction")
-                yield self.env.timeout(1)
-                continue
+            self._log("Fetching instruction at PC {}", self.reg_file["PC"])
+            yield self.env.timeout(self.config.fetch_latency)
 
-            ni, self.next_instruction = self.next_instruction, None
-
-            if isinstance(ni, HaltInstruction):
-                self._log("HLT found, stopping the issue of new instructions")
+            # TODO: find a better way to log execution traces without deepcopying the instruction object
+            # Right now the object is copied so stats can be saved directly into it, and it works even for
+            # tight loops where the same instruction may be executing many times simultaneously
+            try:
+                next_instruction = deepcopy(self._instructions[self.reg_file["PC"]])
+            except IndexError:
+                self._log("WARNING: PC {} is out of range", self.reg_file["PC"])
+                self._log("Use HLT instructions")
                 return
 
-            if isinstance(ni, BreakpointInstruction):
-                if ni.handler is not None:
-                    ni.handler(self)
+            self._log("Fetched {}", next_instruction)
+            self.reg_file["PC"] += 1
+
+            if isinstance(next_instruction, HaltInstruction):
+                return
+
+            if isinstance(next_instruction, BreakpointInstruction):
+                if next_instruction.handler is not None:
+                    next_instruction.handler(self)
                 self.breakpoint_handler(self)
                 continue
 
-            rs = self.find_free_reservation_station(ni)
-            while rs is None:
-                self._log("Structural hazard: no RS found for {}", ni)
-                yield self.env.timeout(1)
-                rs = self.find_free_reservation_station(ni)
+            # Get an appropriate reservation station
+            rs = yield self.env.process(self.get_reservation_station(next_instruction))
 
-            self._log("Issuing {} to {}", ni, rs)
+            # Loads and stores also need a spot in the memory access queue
+            if isinstance(rs, MemReservationStation):
+                yield self.env.process(self.memory.enqueue_memory_access(rs, next_instruction))
 
-            # Lock the reservation station
-            rs_lock = rs.request()
-            yield rs_lock
-            # Send the instruction to the reservation station
-            rs.enqueue_instruction(ni, rs_lock)
+            # Issue the instruction to the reservation station
+            self._log("Issuing {} to {}", next_instruction, rs)
+            self.env.process(rs.issue(next_instruction))
 
-            if isinstance(ni, ControlFlowInstruction):
+            # TODO: log fetch stall (as conflict)
+            # TODO: implement speculative execution
+            if isinstance(next_instruction, ControlFlowInstruction):
                 self._log("Stalling fetches until the new PC is available")
-                broadcast = yield rs.result_broadcast_event
-                self.reg_file.values["PC"] = broadcast.result
+                self.reg_file.values["PC"] = yield self.CDB.snoop(rs)
 
-    def find_free_reservation_station(self, instruction):
+    def get_reservation_station(self, instruction):
         if isinstance(instruction, AluInstruction):
-            rs_list = self.alu_RS
+            if isinstance(instruction, FloatingInstruction):
+                rs_store = self.fpalu_RS
+            else:
+                rs_store = self.alu_RS
         elif isinstance(instruction, MemInstruction):
-            rs_list = self.mem_RS
+            rs_store = self.mem_RS
         else:
             raise Exception("Unrecognized instruction: {}".format(instruction))
 
-        for rs in rs_list:
-            if rs.busy:
-                continue
-            else:
-                return rs
+        # FIXME
+        # this code sucks a bit, but it's necessary to detect
+        # structural hazards immediately to print them in order.
+        # Checking if rs_store.items is empty does not work, as
+        # an RS may be be relased right after we yield so no conflict is happening
+        # The idea is to check if the request is granted in zero time,
+        # but any_of is not guaranteed to yield both the resource request and the timeout
+        # at the same time (as in in a single call), even if they will trigger at the same
+        # simulation time.
+        # Possible definitive solutions:
+        # 1) ignore the problem and not print conflicts in real time
+        # 2) use a 0.1 clock-cycles timeout (so the resource request will be granted first if any is available)
+        store_req_start = self.env.now
+        rs_req = rs_store.get()
+        res = yield self.env.any_of([rs_req, self.env.timeout(0)])
 
-        return None
+        if rs_req in res:
+            hazard = False
+            obtained_rs = rs_req.value
+        else:
+            self._log("Structural hazard: no RS available for {}", instruction)
+            hazard = True
+            obtained_rs = yield rs_req
+
+        if hazard:
+            self._log("Structural hazard solved: obtained {} for {}", obtained_rs, instruction)
+            instruction.stats.hazards.append(etrace.RSUnavailableHazard(store_req_start, self.env.now, obtained_rs))
+
+        return obtained_rs
 
     def run(self):
-        yield self.env.process(self.issue())
+        self._log("Starting instruction dispatch")
+        yield self.env.process(self._dispatch())
+        self._log("Stopped instruction dispatch")
 
-    def can_fetch(self):
-        return self.next_instruction is None
+    def dump_memory(self):
+        for addr in range(0, len(self.memory._memory), 4):
+            contents = ["0x{:0>2x}".format(m) for m in self.memory._memory[addr:addr + 4]]
+            print("0x{:x}: ".format(addr).ljust(6) + " ".join(contents))
 
     @staticmethod
     def _default_breakpoint_handler(cpu):
-        cpu._log("Breakpoint hit")
+        cpu._log("Breakpoint hit, registers: {}", cpu.reg_file)
 
     def __repr__(self):
-        return "CLK {:>5n} | CPU Registers: {}".format(self.env.now, self.reg_file)
-
+        return "CLK {:>3n} | CPU Registers: {}".format(self.env.now, self.reg_file)

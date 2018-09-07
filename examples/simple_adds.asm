@@ -1,0 +1,5 @@
+ADD R1, R0, 1
+ADD R2, R1, 1
+ADD R1, R2, 1
+ADD R1, R1, 1
+HLT

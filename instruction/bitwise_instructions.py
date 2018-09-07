@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from .alu_instructions import AluInstruction
 
 
-class IntegerInstruction(AluInstruction, ABC):
+class BitwiseInstruction(AluInstruction, ABC):
     def __init__(self, dst_reg, op1, op2):
         super().__init__(dst_reg)
         self.OP1 = op1
@@ -24,17 +24,17 @@ class IntegerInstruction(AluInstruction, ABC):
         raise NotImplementedError()
 
 
-class AddInstruction(IntegerInstruction):
-    mnemonic = "ADD"
+class AndInstruction(BitwiseInstruction):
+    mnemonic = "AND"
 
     @staticmethod
     def result(op1, op2):
-        return (op1 + op2) % 0x100
+        return (op1 & op2) & 0xff
 
 
-class SubInstruction(IntegerInstruction):
-    mnemonic = "SUB"
+class OrInstruction(BitwiseInstruction):
+    mnemonic = "OR"
 
     @staticmethod
     def result(op1, op2):
-        return (op1 - op2) % 0x100
+        return (op1 | op2) & 0xff
