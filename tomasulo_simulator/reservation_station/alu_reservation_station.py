@@ -1,11 +1,11 @@
-from instruction import AluInstruction
-from instruction import BitwiseInstruction
-from instruction import BranchInstruction
-from instruction import ControlFlowInstruction
-from instruction import FloatingInstruction
-from instruction import IntegerInstruction
-from instruction import JumpInstruction
-from instruction import LogicInstruction
+from ..instruction import AluInstruction
+from ..instruction import BitwiseInstruction
+from ..instruction import BranchInstruction
+from ..instruction import ControlFlowInstruction
+from ..instruction import FloatingInstruction
+from ..instruction import IntegerInstruction
+from ..instruction import JumpInstruction
+from ..instruction import LogicInstruction
 from .reservation_station import ReservationStation
 
 
@@ -21,7 +21,8 @@ class ALUReservationStation(ReservationStation):
         self.OP2_val = None
 
     def _decode_operands(self):
-        if isinstance(self.instruction, (IntegerInstruction, LogicInstruction, BitwiseInstruction, BranchInstruction)):
+        if isinstance(self.instruction, (IntegerInstruction, LogicInstruction, BitwiseInstruction,
+                                         BranchInstruction, FloatingInstruction)):
             self.OP1_read = self._read_operand(self.instruction.OP1)
             self.OP2_read = self._read_operand(self.instruction.OP2)
 

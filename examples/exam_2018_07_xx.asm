@@ -7,7 +7,7 @@
 .cdb_width 1
 
 LD R6, [R2 + 32]
-FADD R2, R6, R4
-FADD R0, R4, R2
-FSUB R7, R2, R6
-ADD R0, R7, R2
+FADD F2, F6, F4
+FADD F3, F4, F2
+FSUB F7, F2, F6
+ADD R3, R7, R2

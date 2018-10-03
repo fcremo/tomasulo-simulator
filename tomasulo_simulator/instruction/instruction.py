@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 
-from execution_trace import ExecutionTrace
-from cpu_config import CpuConfig
+from ..cpu_config import CpuConfig
 
 
 class Instruction(ABC):
     incremental_id = 1
 
     def __init__(self):
+        from ..execution_trace import ExecutionTrace
+
         self.id = Instruction.incremental_id
         Instruction.incremental_id += 1
 
@@ -35,11 +36,6 @@ class Instruction(ABC):
             if latency is not None:
                 return latency
         return None
-        """
-        if self.__class__ is Instruction:
-            return None
-        return  or Instruction.latency(super(self.__class__, self), config)
-        """
 
     def __repr__(self):
         return "INS #{}: {}".format(self.id, self.mnemonic_full)

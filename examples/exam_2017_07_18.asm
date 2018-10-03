@@ -7,7 +7,7 @@
 .alu_rs 2
 .alu_fu 1
 .memrs_execution_latency 4
-.alurs_execution_latency
+.alurs_execution_latency 2
 .cdb_width 1
 
 LD R1, [0 + R6]

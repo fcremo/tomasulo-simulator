@@ -2,19 +2,19 @@ from copy import deepcopy
 
 import simpy
 
-import execution_trace as etrace
-from cpu_config import CpuConfig
-from cdb import CDB
-from functional_unit import AluFU, MemFU
-from instruction import (
+from tomasulo_simulator import execution_trace as etrace
+from tomasulo_simulator.cpu_config import CpuConfig
+from tomasulo_simulator.cdb import CDB
+from tomasulo_simulator.functional_unit import AluFU, MemFU
+from tomasulo_simulator.instruction import (
     HaltInstruction, BreakpointInstruction,
     ControlFlowInstruction, MemInstruction,
     AluInstruction, FloatingInstruction
 )
-from log_utils import get_logger
-from memory import Memory
-from registerfile import RegisterFile
-from reservation_station import ALUReservationStation, MemReservationStation
+from tomasulo_simulator.log_utils import get_logger
+from tomasulo_simulator.memory import Memory
+from tomasulo_simulator.registerfile import RegisterFile
+from tomasulo_simulator.reservation_station import ALUReservationStation, MemReservationStation
 
 
 class CPU:

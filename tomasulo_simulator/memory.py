@@ -1,9 +1,9 @@
 import simpy
 
-import execution_trace as etrace
-from cpu_config import CpuConfig
-from instruction import StoreInstruction
-from log_utils import get_logger
+from tomasulo_simulator import execution_trace as etrace
+from tomasulo_simulator.cpu_config import CpuConfig
+from tomasulo_simulator.instruction import StoreInstruction
+from tomasulo_simulator.log_utils import get_logger
 
 
 class Memory:

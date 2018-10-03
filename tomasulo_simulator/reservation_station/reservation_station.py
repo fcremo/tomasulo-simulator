@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
 
-import execution_trace as etrace
-from log_utils import get_logger
+from tomasulo_simulator import execution_trace as etrace
+from tomasulo_simulator.log_utils import get_logger
 
 
 class ReservationStation(ABC):

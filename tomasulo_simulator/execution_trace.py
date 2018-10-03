@@ -1,8 +1,8 @@
 from collections import namedtuple
 from json import JSONEncoder
 
-import functional_unit
-import instruction
+from . import functional_unit, reservation_station
+from .instruction import Instruction
 
 RSUnavailableHazard = namedtuple("RSUnavailableHazard", "detected_at solved_at assigned_rs")
 FUUnavailableHazard = namedtuple("FUUnavailableHazard", "detected_at solved_at assigned_fu")
@@ -24,12 +24,11 @@ class ExecutionTrace:
         self.fu = None
 
     def to_dict(self):
-        import reservation_station
         d = {}
         for k, v in self.__dict__.items():
             if isinstance(v, (reservation_station.ReservationStation, functional_unit.FunctionalUnit)):
                 d[k] = v.id
-            elif isinstance(v, instruction.Instruction):
+            elif isinstance(v, Instruction):
                 d[k] = str(v)
             else:
                 d[k] = v

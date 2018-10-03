@@ -1,4 +1,4 @@
-from instruction.mem_instructions import StoreInstruction, LoadInstruction
+from tomasulo_simulator.instruction import StoreInstruction, LoadInstruction
 from .reservation_station import ReservationStation
 
 

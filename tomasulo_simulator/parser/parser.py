@@ -1,21 +1,21 @@
 from lark import Lark
 from pkg_resources import resource_string
 
-from instruction import HaltInstruction
-from instruction import Label
-from instruction.bitwise_instructions import AndInstruction, OrInstruction
-from instruction.control_flow_instructions import (
+from ..instruction import HaltInstruction
+from ..instruction import Label
+from ..instruction.bitwise_instructions import AndInstruction, OrInstruction
+from ..instruction import (
     BEQInstruction, BNEInstruction,
     BLTInstruction, BLEInstruction,
     BGTInstruction, BGEInstruction,
     JumpInstruction
 )
-from instruction.floating_instructions import FAddInstruction, FSubInstruction
-from instruction.integer_instructions import AddInstruction, SubInstruction
-from instruction.logic_instructions import AndlInstruction, OrlInstruction
-from instruction.mem_instructions import LoadInstruction, StoreInstruction
+from ..instruction.floating_instructions import FAddInstruction, FSubInstruction
+from ..instruction.integer_instructions import AddInstruction, SubInstruction
+from ..instruction.logic_instructions import AndlInstruction, OrlInstruction
+from ..instruction import LoadInstruction, StoreInstruction
 
-grammar = resource_string("parser", "grammar.lark").decode("utf-8")
+grammar = resource_string("tomasulo_simulator.parser", "grammar.lark").decode("utf-8")
 
 
 class Parser:
@@ -39,10 +39,6 @@ class Parser:
                 return AddInstruction(dst, op1, op2)
             elif operation == "SUB":
                 return SubInstruction(dst, op1, op2)
-            elif operation == "FADD":
-                return FAddInstruction(dst, op1, op2)
-            elif operation == "FSUB":
-                return FSubInstruction(dst, op1, op2)
             elif operation == "AND":
                 return AndInstruction(dst, op1, op2)
             elif operation == "OR":
@@ -51,6 +47,15 @@ class Parser:
                 return AndlInstruction(dst, op1, op2)
             elif operation == "ORL":
                 return OrlInstruction(dst, op1, op2)
+        if instruction.data == "fp_alu_instruction":
+            operation = self.get_fp_alu_op(instruction)
+            dst = self.get_fp_dst(instruction)
+            op1 = self.get_fp_op1(instruction)
+            op2 = self.get_fp_op2(instruction)
+            if operation == "FADD":
+                return FAddInstruction(dst, op1, op2)
+            elif operation == "FSUB":
+                return FSubInstruction(dst, op1, op2)
         elif instruction.data == "jump_instruction":
             label = self.get_label(instruction)
             return JumpInstruction(label)
@@ -157,6 +162,32 @@ class Parser:
             return int(operand)
         except ValueError:
             return operand
+
+    def get_fp_alu_op(self, instruction):
+        return self.get_first_child(instruction, "fp_alu_op", upper=True)
+
+    def get_fp_op1(self, instruction):
+        operand = self.get_first_child(instruction, "fp_operand1", upper=True)
+        if operand in self.constants:
+            return self.constants[operand]
+
+        try:
+            return int(operand)
+        except ValueError:
+            return operand
+
+    def get_fp_op2(self, instruction):
+        operand = self.get_first_child(instruction, "fp_operand2", upper=True)
+        if operand in self.constants:
+            return self.constants[operand]
+
+        try:
+            return int(operand)
+        except ValueError:
+            return operand
+
+    def get_fp_dst(self, instruction):
+        return self.get_first_child(instruction, "fp_dst_register", upper=True)
 
     def get_branch_op(self, instruction):
         return self.get_first_child(instruction, "branch_op", upper=True)

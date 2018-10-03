@@ -6,11 +6,11 @@ import IPython
 import pandas as pd
 import simpy
 
-from parser import Parser
-from assembler import assemble
-from cpu_config import CpuConfig
-from cpu import CPU
-from execution_trace import ExecutionTraceSerializer
+from tomasulo_simulator import Parser
+from tomasulo_simulator import assemble
+from tomasulo_simulator import CpuConfig
+from tomasulo_simulator import CPU
+from tomasulo_simulator.execution_trace import ExecutionTraceSerializer
 
 
 def main():

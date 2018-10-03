@@ -1,6 +1,6 @@
-import execution_trace as etrace
-from log_utils import get_logger
-from reservation_station import ReservationStation
+from tomasulo_simulator import execution_trace as etrace
+from tomasulo_simulator.log_utils import get_logger
+from tomasulo_simulator.reservation_station import ReservationStation
 
 
 class RegisterFile:

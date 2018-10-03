@@ -2,8 +2,8 @@ from collections import namedtuple
 
 import simpy
 
-from execution_trace import CDBUnavailableHazard
-from log_utils import get_logger
+from tomasulo_simulator.execution_trace import CDBUnavailableHazard
+from tomasulo_simulator.log_utils import get_logger
 
 
 class CDB(simpy.Resource):

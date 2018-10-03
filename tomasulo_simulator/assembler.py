@@ -1,4 +1,4 @@
-import instruction
+from tomasulo_simulator import instruction
 
 
 class Assembler:

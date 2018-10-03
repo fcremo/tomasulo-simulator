@@ -6,6 +6,7 @@ start: directives instructions
 instructions: instruction+
 ?instruction: control_flow_instruction
             | alu_instruction
+            | fp_alu_instruction
             | mem_instruction
             | halt_instruction
             | label_declaration
@@ -21,9 +22,11 @@ jump_instruction: "JMP"i label
 // TODO: add NOT instruction
 alu_instruction: alu_op dst_register "," operand1 "," operand2
 !alu_op:  "ADD"i | "SUB"i
-        | "FADD"i | "FSUB"i
         | "OR"i | "AND"i
         | "ORL"i | "ANDL"i
+
+fp_alu_instruction: fp_alu_op fp_dst_register "," fp_operand1 "," fp_operand2
+!fp_alu_op:  "FADD"i | "FSUB"i
 
 // Memory instructions
 ?mem_instruction: load_instruction | store_instruction
@@ -42,14 +45,18 @@ label: LABEL
 const_declaration: ".const" CONSTNAME IMMEDIATE
 CONSTNAME: /![a-z_][0-9a-z_]*/i
 
-operand1: GPREGISTER | FPREGISTER | IMMEDIATE | CONSTNAME
-operand2: GPREGISTER | FPREGISTER | IMMEDIATE | CONSTNAME
+operand1: GPREGISTER | IMMEDIATE | CONSTNAME
+operand2: GPREGISTER | IMMEDIATE | CONSTNAME
 operand:  GPREGISTER | FPREGISTER | IMMEDIATE | CONSTNAME
 
 dst_register: GPREGISTER
 src_register: GPREGISTER
 register: GPREGISTER | FPREGISTER
 immediate: IMMEDIATE | CONSTNAME
+
+fp_dst_register: FPREGISTER
+fp_operand1: FPREGISTER | IMMEDIATE | CONSTNAME
+fp_operand2: FPREGISTER | IMMEDIATE | CONSTNAME
 
 LABEL: /[a-z_][0-9a-z_]*/i
 GPREGISTER: /R[0-9]+/i
